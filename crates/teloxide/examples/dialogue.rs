@@ -1,31 +1,48 @@
-// This is a bot that asks you three questions, e.g. a simple test.
-//
-// # Example
-// ```
-//  - Hey
-//  - Let's start! What's your full name?
-//  - Gandalf the Grey
-//  - How old are you?
-//  - 223
-//  - What's your location?
-//  - Middle-earth
-//  - Full name: Gandalf the Grey
-//    Age: 223
-//    Location: Middle-earth
-// ```
+//! # Dialogue Bot Example – "3 Questions Bot"
+//!
+//! This bot walks the user through a simple 3-step dialogue:
+//!
+//! ```text
+//! User: Hey
+//! Bot: Let's start! What's your full name?
+//! User: Gandalf the Grey
+//! Bot: How old are you?
+//! User: 223
+//! Bot: What's your location?
+//! User: Middle-earth
+//! Bot: Full name: Gandalf the Grey
+//!      Age: 223
+//!      Location: Middle-earth
+//! ```
+//!
+//! It uses `teloxide`’s `Dialogue` system with in-memory storage (`InMemStorage`).
+//! Each step is a separate state, and transitions are handled based on user input.
+//!
+//! ## Features Demonstrated
+//!
+//! - Multi-step conversation (dialogue FSM)  
+//! - Typed dialogue states using enums  
+//! - State transitions and validation (e.g., age must be a number)  
+//! - Final message summary + dialogue exit
+
 use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
 
+/// Type alias for cleaner handler signatures.
 type MyDialogue = Dialogue<State, InMemStorage<State>>;
 type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
+/// Enum representing each step/state in the dialogue.
 #[derive(Clone, Default)]
 pub enum State {
     #[default]
     Start,
+    /// Waiting for full name.
     ReceiveFullName,
+    /// Waiting for age, after getting full name.
     ReceiveAge {
         full_name: String,
     },
+    /// Waiting for location, after getting full name and age.
     ReceiveLocation {
         full_name: String,
         age: u8,
@@ -57,12 +74,14 @@ async fn main() {
     .await;
 }
 
+/// First message — starts the dialogue.
 async fn start(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
     bot.send_message(msg.chat.id, "Let's start! What's your full name?").await?;
     dialogue.update(State::ReceiveFullName).await?;
     Ok(())
 }
 
+/// Receives full name from user and transitions to age input.
 async fn receive_full_name(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
     match msg.text() {
         Some(text) => {
@@ -77,6 +96,7 @@ async fn receive_full_name(bot: Bot, dialogue: MyDialogue, msg: Message) -> Hand
     Ok(())
 }
 
+/// Receives age and moves on to ask for location.
 async fn receive_age(
     bot: Bot,
     dialogue: MyDialogue,
@@ -96,6 +116,7 @@ async fn receive_age(
     Ok(())
 }
 
+/// Final step: collects location, summarizes everything, and ends the dialogue.
 async fn receive_location(
     bot: Bot,
     dialogue: MyDialogue,

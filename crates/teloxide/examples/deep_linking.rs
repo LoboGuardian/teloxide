@@ -1,15 +1,28 @@
-//! This example demonstrates how to use deep linking in Telegram
-//! by making a simple anonymous message bot.
+//! # Deep Linking Bot Example – Anonymous Messaging
 //!
-//! Deep linking (links like https://t.me/some_bot?start=123456789)
+//! This bot demonstrates how to use **Telegram deep linking** to let users message each other anonymously via a bot.
+//!
+//! ## How it works:
+//!
+//! 1. A user runs `/start` or visits `https://t.me/your_bot`
+//! 2. The bot replies with a **personal link**:  
+//!    -> `https://t.me/your_bot?start=<user_chat_id>`
+//! 3. Another person visits that link — the bot asks them for a message.
+//! 4. That message is then forwarded anonymously to the original user.
+//!
+//! ## Notes on Deep Linking
+//!
+//! Deep linking (links like https://t.me/your_bot?start=123456789)
 //! is handled by telegram in the same way as just sending /start {argument}.
 //! So, in the StartCommand enum we need to write Start(String)
 //! to get the argument, just like in command.rs example.
 //!
-//! Also, deep linking is only supported with /start command!
-//! "https://t.me/some_bot?argument=123456789" will not work
+//! - Only the `/start` command supports deep linking parameters.
+//! - `/start 123456789` and `https://t.me/your_bot?start=123456789` are treated the same.
+//! - `https://t.me/your_bot?argument=123456789` will **not** work!
 //!
-//! https://core.telegram.org/bots/features#deep-linking
+//! More info: https://core.telegram.org/bots/features#deep-linking
+
 use dptree::{case, deps};
 use teloxide::{
     dispatching::dialogue::{self, InMemStorage},
@@ -18,18 +31,20 @@ use teloxide::{
     types::{Me, ParseMode},
 };
 
+/// Dialogue type using in-memory storage.
 pub type MyDialogue = Dialogue<State, InMemStorage<State>>;
 pub type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
+/// The state of the dialogue.
 #[derive(Clone, PartialEq, Debug, Default)]
 pub enum State {
     #[default]
     Start,
-    WriteToSomeone {
-        id: ChatId,
-    },
+    /// The user is replying to someone via deep link.
+    WriteToSomeone { id: ChatId, },
 }
 
+/// Only one supported command — /start <optional-arg>
 #[derive(BotCommands, Clone, Debug)]
 #[command(rename_rule = "lowercase")]
 pub enum StartCommand {
@@ -62,6 +77,10 @@ async fn main() {
         .await;
 }
 
+/// Handles /start (with or without an argument).
+///
+/// - If no argument → show the user their deep link.
+/// - If argument present → parse it as a ChatId and ask for a message.
 pub async fn start(
     bot: Bot,
     dialogue: MyDialogue,
@@ -98,6 +117,7 @@ pub async fn start(
     Ok(())
 }
 
+/// Sends the anonymous message to the original user, if possible.
 pub async fn send_message(
     bot: Bot,
     id: ChatId, // Available from `State::WriteToSomeone`

@@ -1,7 +1,28 @@
+//! # Inline Mode Bot Example
+//!
+//! This bot replies to **inline queries** with search links.
+//!
+//! You can use it from *any* chat by typing:
+//!
+//! ```text
+//! @your_bot_name rust programming
+//! ```
+//!
+//! It will respond with clickable options like “Google Search” and “DuckDuckGo Search”
+//! based on the query text you typed.
+//!
+//! ## Features Demonstrated
+//!
+//! - Handling inline queries with `Update::filter_inline_query`  
+//! - Constructing `InlineQueryResultArticle`s  
+//! - Using `.description`, `.thumbnail_url`, and `.url`  
+//! - Safe handling of errors via logging
+
 use teloxide::{
     prelude::*,
     types::{
-        InlineQueryResult, InlineQueryResultArticle, InputMessageContent, InputMessageContentText,
+        InlineQueryResult, InlineQueryResultArticle, InputMessageContent,
+        InputMessageContentText,
     },
 };
 
@@ -12,9 +33,12 @@ async fn main() {
 
     let bot = Bot::from_env();
 
+    // Define handler for inline queries.
     let handler = Update::filter_inline_query().branch(dptree::endpoint(
         |bot: Bot, q: InlineQuery| async move {
+
             // First, create your actual response
+            // Build the response for the query.
             let google_search = InlineQueryResultArticle::new(
                 // Each item needs a unique ID, as well as the response container for the
                 // items. These can be whatever, as long as they don't
@@ -23,10 +47,11 @@ async fn main() {
                 // What the user will actually see
                 "Google Search",
                 // What message will be sent when clicked/tapped
-                InputMessageContent::Text(InputMessageContentText::new(format!(
-                    "https://www.google.com/search?q={}",
-                    q.query,
-                ))),
+                InputMessageContent::Text(
+                    InputMessageContentText::new(format!(
+                        "https://www.google.com/search?q={}", q.query,
+                   )),
+                ),
             );
             // While constructing them from the struct itself is possible, it is preferred
             // to use the builder pattern if you wish to add more
@@ -44,6 +69,7 @@ async fn main() {
             .thumbnail_url("https://duckduckgo.com/assets/logo_header.v108.png".parse().unwrap())
             .url("https://duckduckgo.com/about".parse().unwrap()); // Note: This is the url that will open if they click the thumbnail
 
+            // Assemble the list of responses.
             let results = vec![
                 InlineQueryResult::Article(google_search),
                 InlineQueryResult::Article(ddg_search),
@@ -52,12 +78,19 @@ async fn main() {
             // Send it off! One thing to note -- the ID we use here must be of the query
             // we're responding to.
             let response = bot.answer_inline_query(&q.id, results).send().await;
+
             if let Err(err) = response {
                 log::error!("Error in handler: {:?}", err);
             }
+
             respond(())
         },
     ));
 
-    Dispatcher::builder(bot, handler).enable_ctrlc_handler().build().dispatch().await;
+    // Launch the dispatcher.
+    Dispatcher::builder(bot, handler)
+    .enable_ctrlc_handler()
+    .build()
+    .dispatch()
+    .await;
 }

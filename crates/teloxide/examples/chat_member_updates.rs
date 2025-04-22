@@ -1,3 +1,17 @@
+//! # 👋 Welcome & Goodbye Bot Example
+//!
+//! This bot welcomes users when they join a chat and says goodbye when they leave.
+//! It uses `teloxide`’s `ChatMemberUpdated` handler to listen for changes in chat membership.
+//!
+//! It also demonstrates how to use the `DefaultParseMode` adaptor to automatically format messages using **HTML**.
+//!
+//! ## Features Demonstrated
+//!
+//! - Handling `ChatMemberUpdated` events  
+//! - Detecting when users join or leave  
+//! - Sending formatted messages using `html::user_mention`  
+//! - Logging every update with `.inspect(...)`  
+
 use teloxide::{prelude::*, types::ParseMode, utils::html};
 use teloxide_core::adaptors::DefaultParseMode;
 
@@ -23,11 +37,14 @@ async fn main() -> ResponseResult<()> {
     // Create a handler for our bot, that will process updates from Telegram
     let handler = dptree::entry()
         .inspect(|u: Update| {
-            eprintln!("{u:#?}"); // Print the update to the console with inspect
+            // Print every received update for debug purposes.
+            // Print the update to the console with inspect
+            eprintln!("{u:#?}");
         })
         .branch(
             Update::filter_chat_member()
                 .branch(
+                    // User joined the chat (transitioned from "left" to "present")
                     dptree::filter(|m: ChatMemberUpdated| {
                         m.old_chat_member.is_left() && m.new_chat_member.is_present()
                     })
@@ -35,19 +52,25 @@ async fn main() -> ResponseResult<()> {
                 )
                 .branch(
                     dptree::filter(|m: ChatMemberUpdated| {
+                        // User left the chat (transitioned from "present" to "left")
                         m.old_chat_member.is_present() && m.new_chat_member.is_left()
                     })
                     .endpoint(left_chat_member),
                 ),
         );
 
-    // Create a dispatcher for our bot
-    Dispatcher::builder(bot, handler).enable_ctrlc_handler().build().dispatch().await;
+    // Set up and start the dispatcher loop.
+    Dispatcher::builder(bot, handler)
+        .enable_ctrlc_handler()
+        .build()
+        .dispatch()
+        .await;
 
     Ok(())
 }
 
 /// Welcome Endpoint
+/// Called when a new user joins the group.
 async fn new_chat_member(bot: Bot, chat_member: ChatMemberUpdated) -> ResponseResult<()> {
     let user = chat_member.old_chat_member.user.clone();
 
@@ -56,20 +79,27 @@ async fn new_chat_member(bot: Bot, chat_member: ChatMemberUpdated) -> ResponseRe
     // We get a "@username" mention via `mention()` method if the user has a
     // username, otherwise we create a textual mention with "Full Name" as the
     // text linking to the user
-    let username =
-        user.mention().unwrap_or_else(|| html::user_mention(user.id, user.full_name().as_str()));
+    let username = user
+        .mention()
+        .unwrap_or_else(|| html::user_mention(user.id, user.full_name().as_str()));
 
-    bot.send_message(chat_member.chat.id, format!("Welcome to {telegram_group_name} {username}!"))
-        .await?;
+    // Send the welcome message.
+    bot.send_message(
+        chat_member.chat.id,
+        format!("Welcome to {telegram_group_name} {username}!")
+    )
+    .await?;
 
     Ok(())
 }
 
+/// Called when a user leaves the group.
 async fn left_chat_member(bot: Bot, chat_member: ChatMemberUpdated) -> ResponseResult<()> {
     let user = chat_member.old_chat_member.user;
 
-    let username =
-        user.mention().unwrap_or_else(|| html::user_mention(user.id, user.full_name().as_str()));
+    let username = user
+        .mention()
+        .unwrap_or_else(|| html::user_mention(user.id, user.full_name().as_str()));
 
     bot.send_message(chat_member.chat.id, format!("Goodbye {username}!")).await?;
 

@@ -1,5 +1,21 @@
-// This example provide a quick overview of the new features in the
-// `dispatching` module.
+//! # Dispatching Features Overview Bot
+//!
+//! This advanced example demonstrates how to use the updated `dispatching` module in `teloxide`.
+//!
+//! It supports multiple branching handlers with contextual filtering:
+//!
+//! - **Simple commands** like `/help`, `/myid`
+//! - **Maintainer-only commands** like `/rand <from> <to>`
+//! - **Group-only commands** with bot mentions (e.g. `/repeat@your_bot`)
+//! - **Special handler for dice messages**
+//!
+//! ## Maintainer-only access
+//!
+//! Set your Telegram user ID here:
+//!
+//! ```rust
+//! bot_maintainer: UserId(0) // replace 0 with your ID
+//! ```
 
 use rand::Rng;
 
@@ -15,12 +31,15 @@ async fn main() {
 
     let bot = Bot::from_env();
 
+    // Custom configuration passed into handlers as a dependency.
     let parameters = ConfigParameters {
-        bot_maintainer: UserId(0), // Paste your ID to run this bot.
+        bot_maintainer: UserId(0), // ← Replace this with your actual Telegram user ID!
         maintainer_username: None,
     };
 
+    // Main dispatcher handler tree
     let handler = Update::filter_message()
+        // === First Branch: simple public commands ===
         // You can use branching to define multiple ways in which an update will be handled. If the
         // first branch fails, an update will be passed to the second branch, and so on.
         .branch(
@@ -30,6 +49,7 @@ async fn main() {
                 // If a command parsing fails, this handler will not be executed.
                 .endpoint(simple_commands_handler),
         )
+        // === Second Branch: maintainer-only commands ===
         .branch(
             // Filter a maintainer by a user ID.
             dptree::filter(|cfg: ConfigParameters, msg: Message| {
@@ -48,6 +68,7 @@ async fn main() {
                 }
             }),
         )
+        // === Third Branch: only for group messages ===
         .branch(
             // Filtering allow you to filter updates by some condition.
             dptree::filter(|msg: Message| msg.chat.is_group() || msg.chat.is_supergroup())
@@ -77,6 +98,7 @@ async fn main() {
                     }),
                 ),
         )
+        // === Fourth Branch: special case for dice messages ===
         .branch(
             // There are some extension filtering functions on `Message`. The following filter will
             // filter only messages with dices.
@@ -89,14 +111,20 @@ async fn main() {
         );
 
     Dispatcher::builder(bot, handler)
+        // Pass configuration and dependencies into handlers
+        //
         // Here you specify initial dependencies that all handlers will receive; they can be
         // database connections, configurations, and other auxiliary arguments. It is similar to
         // `actix_web::Extensions`.
         .dependencies(dptree::deps![parameters])
+        // Catch unhandled updates
+        //
         // If no handler succeeded to handle an update, this closure will be called.
         .default_handler(|upd| async move {
             log::warn!("Unhandled update: {:?}", upd);
         })
+        // Catch global errors
+        //
         // If the dispatcher fails for some reason, execute this handler.
         .error_handler(LoggingErrorHandler::with_custom_text(
             "An error has occurred in the dispatcher",
@@ -107,34 +135,35 @@ async fn main() {
         .await;
 }
 
+// === Global Configuration Struct ===
 #[derive(Clone)]
 struct ConfigParameters {
     bot_maintainer: UserId,
     maintainer_username: Option<String>,
 }
 
-/// Simple commands
+// === Simple User Commands ===
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 enum SimpleCommand {
-    /// Shows this message.
+    /// Shows this help message.
     Help,
-    /// Shows maintainer info.
+    /// Shows who the bot maintainer is.
     Maintainer,
-    /// Shows your ID.
+    /// Shows your Telegram ID.
     MyId,
 }
 
-/// Maintainer commands
+/// Shows your Telegram ID.
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 enum MaintainerCommands {
-    /// Generate a number within range
+    /// Generate a random number in range
     #[command(parse_with = "split")]
     Rand { from: u64, to: u64 },
 }
 
-/// Group commands
+// === Group-only Commands ===
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 enum GroupCommand {
@@ -142,6 +171,7 @@ enum GroupCommand {
     Repeat { text: String },
 }
 
+// === Handler for Simple Commands ===
 async fn simple_commands_handler(
     cfg: ConfigParameters,
     bot: Bot,

@@ -1,6 +1,27 @@
-use std::str::FromStr;
+//! # Admin Bot Example (with `teloxide`)
+//!
+//! This example shows how to create a Telegram bot with admin capabilities like:
+//! - Kicking users
+//! - Temporarily banning users
+//! - Muting users
+//!
+//! The commands require replying to a user's message to target them.
+//!
+//! ## Supported Commands
+//!
+//! - `/kick` — Kicks the replied user from the chat.
+//! - `/ban <time> <unit>` — Bans the replied user for a period (e.g., `/ban 5 m`).
+//! - `/mute <time> <unit>` — Mutes the replied user for a period.
+//! - `/help` — Shows the list of available commands.
+//!
+//! ## Time Units
+//!
+//! - `s`, `seconds`
+//! - `m`, `minutes`
+//! - `h`, `hours`
 
 use chrono::Duration;
+use std::str::FromStr;
 use teloxide::{prelude::*, types::ChatPermissions, utils::command::BotCommands};
 
 // Derive BotCommands to parse text with a command into this enumeration.
@@ -14,24 +35,23 @@ use teloxide::{prelude::*, types::ChatPermissions, utils::command::BotCommands};
 // %PREFIX%%COMMAND% - %DESCRIPTION%
 
 /// Use commands in format /%command% %num% %unit%
+/// Commands for the bot. Commands are parsed automatically from messages using `BotCommands`.
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase", parse_with = "split")]
 enum Command {
-    /// Kick user from chat.
+    /// Kick the replied user from the chat.
     Kick,
-    /// Ban user in chat.
-    Ban {
-        time: u64,
-        unit: UnitOfTime,
-    },
-    /// Mute user in chat.
-    Mute {
-        time: u64,
-        unit: UnitOfTime,
-    },
+    /// Temporarily ban the replied user.
+    /// Usage: /ban <time> <unit>
+    Ban { time: u64, unit: UnitOfTime },
+    /// Temporarily mute the replied user.
+    /// Usage: /mute <time> <unit>
+    Mute { time: u64, unit: UnitOfTime },
+    /// Show available commands.
     Help,
 }
 
+/// Units of time accepted for mute/ban durations.
 #[derive(Clone)]
 enum UnitOfTime {
     Seconds,
@@ -61,6 +81,7 @@ async fn main() {
     Command::repl(bot, action).await;
 }
 
+/// Handles each command from users.
 async fn action(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     match cmd {
         Command::Help => {
@@ -74,7 +95,9 @@ async fn action(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     Ok(())
 }
 
-// Kick a user with a replied message.
+/// Kicks the replied user from the chat.
+///
+/// The command must be used in reply to another user's message.
 async fn kick_user(bot: Bot, msg: Message) -> ResponseResult<()> {
     match msg.reply_to_message() {
         Some(replied) => {
@@ -88,7 +111,7 @@ async fn kick_user(bot: Bot, msg: Message) -> ResponseResult<()> {
     Ok(())
 }
 
-// Ban a user with replied message.
+/// Bans the replied user for a limited time.
 async fn ban_user(bot: Bot, msg: Message, time: Duration) -> ResponseResult<()> {
     match msg.reply_to_message() {
         Some(replied) => {
@@ -107,7 +130,7 @@ async fn ban_user(bot: Bot, msg: Message, time: Duration) -> ResponseResult<()> 
     Ok(())
 }
 
-// Mute a user with a replied message.
+/// Mutes the replied user for a limited time.
 async fn mute_user(bot: Bot, msg: Message, time: Duration) -> ResponseResult<()> {
     match msg.reply_to_message() {
         Some(replied) => {
@@ -127,10 +150,12 @@ async fn mute_user(bot: Bot, msg: Message, time: Duration) -> ResponseResult<()>
     Ok(())
 }
 
+/// Converts a time value and unit into a `chrono::Duration`.
 // Calculates time of user restriction.
 fn calc_restrict_time(time: u64, unit: UnitOfTime) -> Duration {
-    // FIXME: actually handle the case of too big integers correctly, instead of
-    // unwrapping
+    // FIXME: actually handle the case of too big integers correctly,
+    // instead of unwrapping
+    // Note: this will panic on overflow. A proper implementation should handle large values safely.
     match unit {
         UnitOfTime::Hours => Duration::try_hours(time as i64).unwrap(),
         UnitOfTime::Minutes => Duration::try_minutes(time as i64).unwrap(),

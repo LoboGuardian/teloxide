@@ -1,3 +1,23 @@
+//! # Buttons & Callback Bot Example
+//!
+//! This bot demonstrates how to create **inline keyboards** in Telegram using `teloxide`.
+//!
+//! It presents a list of Debian codenames as buttons (grouped by 3 per row).
+//! When a user clicks a button, the bot replies with their selected version.
+//!
+//! It also supports inline queries and parses commands like `/start` and `/help`.
+//!
+//! ## Features demonstrated
+//!
+//! - Parsing commands with `BotCommands`  
+//! - Sending `InlineKeyboardMarkup`  
+//! - Handling `CallbackQuery` from button clicks  
+//! - Responding to `InlineQuery` with interactive results
+//!
+//! Try sending `/start` to see the button grid!
+//!
+//! **Security Tip:** Don’t put private data in callback payloads — it's visible to any client.
+
 use std::error::Error;
 use teloxide::{
     payloads::SendMessageSetters,
@@ -10,11 +30,11 @@ use teloxide::{
     utils::command::BotCommands,
 };
 
-/// These commands are supported:
+/// Supported bot commands.
 #[derive(BotCommands)]
 #[command(rename_rule = "lowercase")]
 enum Command {
-    /// Display this text
+    /// Display this help message.
     Help,
     /// Start
     Start,
@@ -27,16 +47,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let bot = Bot::from_env();
 
+    // Define the dispatcher that routes updates to appropriate handlers.
     let handler = dptree::entry()
         .branch(Update::filter_message().endpoint(message_handler))
         .branch(Update::filter_callback_query().endpoint(callback_handler))
         .branch(Update::filter_inline_query().endpoint(inline_query_handler));
 
-    Dispatcher::builder(bot, handler).enable_ctrlc_handler().build().dispatch().await;
+    Dispatcher::builder(bot, handler)
+        .enable_ctrlc_handler()
+        .build()
+        .dispatch()
+        .await;
+
     Ok(())
 }
 
-/// Creates a keyboard made by buttons in a big column.
+/// Builds an inline keyboard with Debian version buttons (3 per row).
 fn make_keyboard() -> InlineKeyboardMarkup {
     let mut keyboard: Vec<Vec<InlineKeyboardButton>> = vec![];
 
@@ -60,6 +86,7 @@ fn make_keyboard() -> InlineKeyboardMarkup {
 /// Parse the text wrote on Telegram and check if that text is a valid command
 /// or not, then match the command. If the command is `/start` it writes a
 /// markup with the `InlineKeyboardMarkup`.
+/// Handles incoming text messages and command parsing.
 async fn message_handler(
     bot: Bot,
     msg: Message,
@@ -86,6 +113,8 @@ async fn message_handler(
     Ok(())
 }
 
+
+/// Responds to inline queries with an article result and a button grid.
 async fn inline_query_handler(
     bot: Bot,
     q: InlineQuery,
@@ -114,6 +143,7 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
         // Tell telegram that we've seen this query, to remove 🕑 icons from the
         // clients. You could also use `answer_callback_query`'s optional
         // parameters to tweak what happens on the client side.
+        // Acknowledge the callback so the "loading" icon disappears.
         bot.answer_callback_query(&q.id).await?;
 
         // Edit text of the message to which the buttons were attached
